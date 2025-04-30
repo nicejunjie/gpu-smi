@@ -7,7 +7,7 @@ A wrapper to create `nvidia-smi` style output of `rocm-smi`/`amd-smi`.
 
 **Example:** <br>
 ```
-junjie@z20:~/mygit$ gpu-smi-amd 
+junjie@z20:~/mygit$ myamd-smi
 +---------------------------------------------------------------------------------v2025.04.29---+
 | Driver: 6.10.5   ROCM-SMI: 3.0.0+94441cb   ROCM-SMI-LIB: 7.4.0                                |
 | AMDSMI Tool: 24.7.1+8dc45db   AMDSMI Library: 25.1.0.0   ROCm: 6.3.3                          |

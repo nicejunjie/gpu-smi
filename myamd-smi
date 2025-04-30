@@ -1,0 +1,209 @@
+#!/bin/bash
+
+myver=2025.04.29
+
+start_time=$(date +%s.%N)
+
+
+
+
+b2gb=1073741824  #Byte to GiB
+b2mb=1048576     #Byte to MiB
+
+gpu_names=()
+gpu_marketing_names=()
+vram_total_mem=()
+vram_used_mem=()
+vis_vram_total_mem=()
+vis_vram_used_mem=()
+gtt_total_mem=()
+gtt_used_mem=()
+
+
+#for rocm-smi
+ids=()
+temps=()
+powers=()
+fans=()
+perfs=()
+pwrcaps=()
+gpus_util=()
+sclks=()
+mclks=()
+
+#for rocm-smi -a
+pci_ids=()
+
+
+
+rawdata_start_time=$(date +%s.%N)
+#rocminfo_data=$(rocminfo)
+#rocmmeminfo_data=$(rocm-smi --showmeminfo all )
+#rocmsmi_data=$(rocm-smi)
+#rocmsmiall_data=$(rocm-smi -a 2>/dev/null)
+#process=`rocm-smi --showpids`
+exec 3< <(rocminfo)
+exec 4< <(rocm-smi --showmeminfo all)
+exec 5< <(rocm-smi)
+exec 6< <(rocm-smi -a 2>/dev/null)
+exec 7< <(rocm-smi --showpids)
+exec 8< <(rocm-smi --showdriver |grep version)
+exec 9< <(rocm-smi --version| paste -sd',' -)
+exec 10< <(amd-smi version)
+# Read results
+rocminfo_data=$(cat <&3); exec 3<&-
+rocmmeminfo_data=$(cat <&4); exec 4<&-
+rocmsmi_data=$(cat <&5); exec 5<&-
+rocmsmiall_data=$(cat <&6); exec 6<&-
+process=$(cat <&7); exec 7<&-
+rocmv1_data=$(cat <&8); exec 8<&-
+rocmv2_data=$(cat <&9); exec 9<&-
+amdsmiv_data=$(cat <&10); exec 10<&-
+
+rawdata_end_time=$(date +%s.%N)
+
+wait
+
+
+processdata_start_time=$(date +%s.%N)
+
+# Process version
+rocmsmi_v=`echo ${rocmv1_data},$rocmv2_data|sed 's/,/   /g'|sed 's/ version//g'`
+amdsmi_v1=`echo $amdsmiv_data |awk -F\| '{printf "%s,%s,%s", $1, $2, $3}'|sed 's/ version//g'|xargs|sed 's/,/ /g'`
+amdsmi_v2=`echo $amdsmiv_data |awk -F\| '{printf "%s,%s", $4, $5}'|sed 's/ version//g'|xargs|sed 's/,/ /g'`
+
+# Process rocminfo
+ while IFS= read -r line; do
+ #   marketing=""; name="
+     if [[ $line == *"Marketing Name:"* ]]; then
+         value=$(echo "$line" | awk -F: '{print $NF}'|sed 's/AMD//g'| sed 's/^[ \t]*//;s/[ \t]*$//')
+         marketing=("AMD $value")
+     elif [[ $line == *"  Name:"* ]]; then
+         value=$(echo "$line" | awk -F: '{print $NF}'| sed 's/^[ \t]*//;s/[ \t]*$//')
+         name=("$value")
+     elif [[ $line == "  Device Type:"* && ${line#*: } =~ GPU ]]; then
+         gpu_names+=("$name")
+         gpu_marketing_names+=("$marketing")
+     fi
+ done <<< "${rocminfo_data}"
+
+# Process rocm-smi --showmeminfo all
+ unit=$b2mb
+ while IFS= read -r line; do
+     if [[ $line == *": VRAM Total Memory"* ]]; then
+         value=$(echo "$line" | awk -v var=$unit '{printf "%.0f", $NF/var}')
+         vram_total_mem+=("$value")
+     elif [[ $line == *": VRAM Total Used Memory"* ]]; then
+         value=$(echo "$line" | awk -v var=$unit '{printf "%.0f", $NF/var}')
+         vram_used_mem+=("$value")
+     elif [[ $line == *": VIS_VRAM Total Memory"* ]]; then
+         value=$(echo "$line" | awk -v var=$unit '{printf "%.0f", $NF/var}')
+         vis_vram_total_mem+=("$value")
+     elif [[ $line == *": VIS_VRAM Total Used  Memory"* ]]; then
+         value=$(echo "$line" | awk -v var=$unit '{printf "%.0f", $NF/var}')
+         vis_vram_used_mem+=("$value")
+     elif [[ $line == *": GTT Total Memory"* ]]; then
+         value=$(echo "$line" | awk -v var=$unit '{printf "%.0f", $NF/var}')
+         gtt_total_mem+=("$value")
+     elif [[ $line == *": GTT Total Used Memory"* ]]; then
+         value=$(echo "$line" | awk -v var=$unit '{printf "%.0f", $NF/var}')
+         gtt_used_mem+=("$value")
+     fi
+ done <<< "$rocmmeminfo_data"
+#while IFS= read -r line; do
+#    [[ $line == *"VRAM Total Memory"* ]] && vram_total_mem+=("${line##*: }")
+#    [[ $line == *"VIS_VRAM Total Memory"* ]] && vis_vram_total_mem+=("${line##*: }")
+#    [[ $line == *"GTT Total Memory"* ]] && gtt_total_mem+=("${line##*: }")
+#done <<< "$rocmmeminfo_data"
+
+# Process rocm-smi
+while read -r line; do
+  # Match lines that start with a device number
+  if [[ "$line" =~ ^[0-9] ]]; then
+    id1=$(awk '{print $3}' <<< "$line")
+    id2=$(awk '{print $4}' <<< "$line")
+    temp=$(awk '{print $5}' <<< "$line")
+    power=$(awk '{printf "%.1fW", $6}' <<< "$line")
+    sclk=$(awk '{print $10}' <<< "$line")
+    mclk=$(awk '{print $11}' <<< "$line")
+    fan=$(awk '{printf "%.0f%%", $12}' <<< "$line")
+    perf=$(awk '{print $13}' <<< "$line")
+    pwrcap=$(awk '{print $14}' <<< "$line")
+    gpu=$(awk '{print $15}' <<< "$line")
+
+    # Append to arrays
+    ids+=("($id1$id2)")
+    temps+=("$temp")
+    powers+=("$power")
+    sclks+=("$sclk")
+    mclks+=("$mclk")
+    fans+=("$fan")
+    perfs+=("$perf")
+    pwrcaps+=("$pwrcap")
+    gpus_util+=("$gpu")
+  fi
+done < <(echo "$rocmsmi_data")
+
+# Process rocm-smi -a
+ while IFS= read -r line; do
+ #   marketing=""; name="
+     if [[ $line == *": PCI Bus:"* ]]; then
+         value=$(echo "$line" | awk '{print $NF}')
+         pci_ids+=("$value")
+     fi
+ done <<< "${rocmsmiall_data}"
+
+
+
+processdata_end_time=$(date +%s.%N)
+
+print_start_time=$(date +%s.%N)
+
+line1="+---------------------------------------------------------------------------------v$myver---+"
+line2="|----------------------------------------+----------------------------------+-------------------|"
+line3="|========================================+==================================+===================|"
+line4="|===============================================================================================|"
+line5="+-----------------------------------------------------------------------------------------------+"
+
+echo "$line1"
+printf "| %-93s |\n" "$rocmsmi_v"
+printf "| %-93s |\n" "$amdsmi_v1"
+[[ "$amdsmi_v2" =~ [^[:space:]] ]] && printf "| %-93s |\n" "$amdsmi_v2"
+echo "$line2"
+echo "| GPU               Name                 |                                  |      GPU-Util     |"
+echo "|  Fan   Temp    Perf    Power-Usage     |      Memory-Usage                |   SCLK     MCLK   |"
+echo "$line3"
+
+for i in "${!gpu_names[@]}"; do
+    percent_vram=$(awk "BEGIN {printf \"%.0f%%\", ${vram_used_mem[$i]} / ${vram_total_mem[$i]}}")
+    percent_gtt=$(awk "BEGIN {printf \"%.0f%%\", ${gtt_used_mem[$i]} / ${gtt_total_mem[$i]}}")
+
+    # First row: Name + VRAM + Util
+    printf "| %-2s  %-34s | VRAM: %6sMiB/%6sMiB (%4s) |        %-10s |\n" \
+        "$i" "${gpu_marketing_names[$i]} (${gpu_names[$i]})" \
+        "${vram_used_mem[$i]}" "${vram_total_mem[$i]}" "$percent_vram" "${gpus_util[$i]}"
+
+    # Second row: Fan/temp/perf/power + GTT + Clocks
+    printf "| %4s  %7s  %-4s  %6s/%-11s | GTT : %6sMiB/%6sMiB (%4s) | %8s %8s |\n" \
+        "${fans[$i]}" "${temps[$i]}" "${perfs[$i]}" "${powers[$i]}" "${pwrcaps[$i]}" \
+        "${gtt_used_mem[$i]}" "${gtt_total_mem[$i]}" "$percent_gtt" \
+        "${sclks[$i]}" "${mclks[$i]}"
+
+    echo "$line2"
+done
+
+
+echo ""
+echo "$line5"
+echo "$process"|sed 's/\t/    /g'| grep -v "=="| sed 's/^[ \t]*//;s/[ \t]*$//' |\
+    grep -v "^$" | awk '{printf "| %-93s |\n", $0}' | sed "/PID/ a $line4"
+echo "$line5"
+
+print_end_time=$(date +%s.%N)
+end_time=$(date +%s.%N)
+
+execution_time=$(echo "$end_time - $start_time" | bc)
+rawdata_time=$(echo "$rawdata_end_time - $rawdata_start_time" | bc)
+processdata_time=$(echo "$processdata_end_time - $processdata_start_time" | bc)
+print_time=$(echo "$print_end_time - $print_start_time" | bc)
+printf "\ngpu-smi runtime: %.3fs  (collect: %.3fs, process: %.3fs, print: %.3fs)\n"  $execution_time  $rawdata_time  $processdata_time  $print_time
