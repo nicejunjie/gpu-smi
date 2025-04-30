@@ -1,4 +1,40 @@
-# intel-smi
+# nvidia-smi style output for AMD and Intel GPUs. 
+Why both AMD and Intel make this so compilicated?! 
+
+
+## For AMD 
+A wrapper to create `nvidia-smi` style output of `rocm-smi`/`amd-smi`. 
+
+**Example:** <br>
+```
+junjie@z20:~/mygit$ gpu-smi-amd 
++---------------------------------------------------------------------------------v2025.04.29---+
+| Driver: 6.10.5   ROCM-SMI: 3.0.0+94441cb   ROCM-SMI-LIB: 7.4.0                                |
+| AMDSMI Tool: 24.7.1+8dc45db   AMDSMI Library: 25.1.0.0   ROCm: 6.3.3                          |
+|----------------------------------------+----------------------------------+-------------------|
+| GPU               Name                 |                                  |      GPU-Util     |
+|  Fan   Temp    Perf    Power-Usage     |      Memory-Usage                |   SCLK     MCLK   |
+|========================================+==================================+===================|
+| 0   AMD Radeon RX 7900 XT (gfx1100)    | VRAM:    185MiB/ 20464MiB (  0%) |        0%         |
+|   0%  27.0°C  auto   10.0W/290.0W      | GTT :     82MiB/ 30928MiB (  0%) |    42Mhz    96Mhz |
+|----------------------------------------+----------------------------------+-------------------|
+| 1   AMD Radeon Graphics (gfx1036)      | VRAM:     16MiB/  2048MiB (  0%) |        0%         |
+|   0%  41.0°C  auto    0.0W/Unsupported | GTT :     14MiB/ 30928MiB (  0%) |     None  2400Mhz |
+|----------------------------------------+----------------------------------+-------------------|
+
++-----------------------------------------------------------------------------------------------+
+| KFD process information:                                                                      |
+| PID        PROCESS NAME    GPU(s)    VRAM USED    SDMA USED    CU OCCUPANCY                   |
+|===============================================================================================|
+| 3926548    ollama          0         0            0            UNKNOWN                        |
+| 94949      ollama          0         0            0            UNKNOWN                        |
++-----------------------------------------------------------------------------------------------+
+
+gpu-smi runtime: 0.134s  (collect: 0.093s, process: 0.036s, print: 0.004s)
+```
+
+
+## For Intel
 A wrapper to create `nvidia-smi` style output of `xpumcli`/`xpu-smi`. 
 *** 
 
