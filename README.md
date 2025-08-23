@@ -1,5 +1,6 @@
 # nvidia-smi style output for AMD and Intel GPUs. 
-Why both AMD and Intel make this so compilicated?! 
+Why both AMD and Intel make this so compilicated?!  
+UPDATE:  Since ROCm 7,  amd-smi produces clear and meaningful output, no need to do this alternative! 
 
 
 ## For AMD 
